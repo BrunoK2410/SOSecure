@@ -4,6 +4,7 @@ import '../shared/sos_button.dart';
 import '../../app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../contacts/contacts_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -11,7 +12,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
-
+    final contactsViewModel = context.watch<ContactsViewModel>();
     if (viewModel.lastMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(
@@ -53,7 +54,7 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   _StatusChip(
                     icon: Icons.contacts,
-                    label: '${viewModel.contactsCount} contacts',
+                    label: '${contactsViewModel.contactsCount} contacts',
                     color: AppColors.primary,
                   ),
                 ],
