@@ -15,8 +15,11 @@ class MapViewModel extends ChangeNotifier {
   double latitude = 45.8150;
   double longitude = 15.9819;
   String locationLabel = 'Unknown location';
+  String? errorMessage;
 
   Future<void> initialize() async {
+    errorMessage = null;
+
     isLocationServiceEnabled = await _locationRepository
         .isLocationServiceEnabled();
 
@@ -33,15 +36,27 @@ class MapViewModel extends ChangeNotifier {
   }
 
   Future<void> requestLocationAccess() async {
+    errorMessage = null;
+
     isLocationServiceEnabled = await _locationRepository
         .isLocationServiceEnabled();
 
     if (!isLocationServiceEnabled) {
+      errorMessage = 'Location services are disabled.';
       notifyListeners();
       return;
     }
 
     final permission = await _locationRepository.requestPermission();
+
+    if (permission == LocationPermission.deniedForever) {
+      isLocationPermissionGranted = false;
+      errorMessage =
+          'Location permission is permanently denied. Enable it from app settings.';
+      notifyListeners();
+      return;
+    }
+
     isLocationPermissionGranted =
         permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
@@ -50,13 +65,17 @@ class MapViewModel extends ChangeNotifier {
 
     if (isLocationPermissionGranted) {
       await centerOnUser();
+    } else {
+      errorMessage = 'Location permission was not granted.';
+      notifyListeners();
     }
   }
 
   Future<void> centerOnUser() async {
-    if (!isLocationPermissionGranted) return;
+    if (!isLocationPermissionGranted || !isLocationServiceEnabled) return;
 
     isLoadingLocation = true;
+    errorMessage = null;
     notifyListeners();
 
     try {
@@ -64,6 +83,14 @@ class MapViewModel extends ChangeNotifier {
       latitude = position.latitude;
       longitude = position.longitude;
       locationLabel = 'Current device location';
+    } on PermissionDeniedException {
+      isLocationPermissionGranted = false;
+      errorMessage = 'Location permission denied.';
+    } on LocationServiceDisabledException {
+      isLocationServiceEnabled = false;
+      errorMessage = 'Location services are disabled.';
+    } catch (e) {
+      errorMessage = 'Failed to get current location: $e';
     } finally {
       isLoadingLocation = false;
       notifyListeners();
