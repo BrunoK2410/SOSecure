@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../../ui/auth/auth_view_model.dart';
 import '../../ui/auth/login/login_screen.dart';
 import '../../ui/auth/register/register_screen.dart';
 import '../../ui/contacts/contacts_screen.dart';
@@ -7,30 +8,78 @@ import '../../ui/history/history_screen.dart';
 import '../../ui/home/home_screen.dart';
 import '../../ui/map/map_screen.dart';
 import '../../ui/profile/profile_screen.dart';
+import '../../ui/shared/main_shell.dart';
+import '../../ui/splash/splash_screen.dart';
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/',
-    routes: [
-      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-        path: '/register',
-        builder: (context, state) => const RegisterScreen(),
-      ),
-      GoRoute(
-        path: '/contacts',
-        builder: (context, state) => const ContactsScreen(),
-      ),
-      GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
-      GoRoute(
-        path: '/history',
-        builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-    ],
-  );
+  static GoRouter createRouter(AuthViewModel authViewModel) {
+    return GoRouter(
+      initialLocation: '/splash',
+      refreshListenable: authViewModel,
+      redirect: (context, state) {
+        final isInitialized = authViewModel.isInitialized;
+        final isLoggedIn = authViewModel.isLoggedIn;
+        final isSplashRoute = state.matchedLocation == '/splash';
+        final isAuthRoute =
+            state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register';
+
+        if (!isInitialized) {
+          // Stay on splash until AuthViewModel reads session stream
+          return '/splash';
+        }
+
+        if (isSplashRoute) {
+          // Initialized now, go to home or login
+          return isLoggedIn ? '/' : '/login';
+        }
+
+        if (!isLoggedIn && !isAuthRoute) {
+          return '/login';
+        }
+
+        if (isLoggedIn && isAuthRoute) {
+          return '/';
+        }
+
+        return null;
+      },
+      routes: [
+        GoRoute(
+          path: '/splash',
+          builder: (context, state) => const SplashScreen(),
+        ),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/register',
+          builder: (context, state) => const RegisterScreen(),
+        ),
+        ShellRoute(
+          builder: (context, state, child) => MainShell(child: child),
+          routes: [
+            GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+            GoRoute(
+              path: '/contacts',
+              builder: (context, state) => const ContactsScreen(),
+            ),
+            GoRoute(
+              path: '/map',
+              builder: (context, state) => const MapScreen(),
+            ),
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/history',
+          builder: (context, state) => const HistoryScreen(),
+        ),
+      ],
+    );
+  }
 }

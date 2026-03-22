@@ -1,18 +1,35 @@
-import 'package:provider/provider.dart';
-import 'home_view_model.dart';
-import '../shared/sos_button.dart';
-import '../../app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../app/theme/app_colors.dart';
+import '../auth/auth_view_model.dart';
 import '../contacts/contacts_view_model.dart';
+import '../history/history_view_model.dart';
+import '../shared/sos_button.dart';
+import 'home_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  String _formatDate(DateTime dateTime) {
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final year = dateTime.year.toString();
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$day.$month.$year at $hour:$minute';
+  }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
     final contactsViewModel = context.watch<ContactsViewModel>();
+    final historyViewModel = context.watch<HistoryViewModel>();
+    final authViewModel = context.watch<AuthViewModel>();
+    final currentUser = authViewModel.currentUser;
+    final firstName = currentUser?.fullName.split(' ').first ?? 'User';
+
     if (viewModel.lastMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(
@@ -21,16 +38,47 @@ class HomeScreen extends StatelessWidget {
         viewModel.clearMessage();
       });
     }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('SOSecure')),
+      appBar: AppBar(
+        titleSpacing: 20,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('SoSecure', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Stay prepared, stay safe',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () => context.push('/profile'),
+              child: CircleAvatar(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                child: Text(
+                  firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome back',
+                'Welcome back, $firstName',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 6),
@@ -39,7 +87,6 @@ class HomeScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
-
               Row(
                 children: [
                   _StatusChip(
@@ -54,23 +101,23 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   _StatusChip(
                     icon: Icons.contacts,
-                    label: '${contactsViewModel.contactsCount} contacts',
+                    label: '${contactsViewModel.contactsCount} contact(s)',
                     color: AppColors.primary,
                   ),
                 ],
               ),
-
-              const SizedBox(height: 32),
+              const SizedBox(height: 44),
 
               Center(
                 child: SosButton(
+                  size: 260,
                   onCompleted: () async {
                     await context.read<HomeViewModel>().triggerSos();
                   },
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               Center(
                 child: Text(
@@ -80,28 +127,20 @@ class HomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-
-              const SizedBox(height: 32),
-
-              _ActionCard(
-                icon: Icons.contact_phone,
-                title: 'Emergency Contacts',
-                subtitle: 'Add and manage trusted contacts',
-                onTap: () => context.push('/contacts'),
-              ),
               const SizedBox(height: 16),
-              _ActionCard(
-                icon: Icons.map,
-                title: 'My Location',
-                subtitle: 'View your current location on the map',
-                onTap: () => context.push('/contacts'),
-              ),
-              const SizedBox(height: 16),
-              _ActionCard(
-                icon: Icons.history,
-                title: 'Alert History',
-                subtitle: 'Review previous SOS events',
-                onTap: () => context.push('/map'),
+
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.history, color: AppColors.primary),
+                  title: const Text('Last alert'),
+                  subtitle: Text(
+                    historyViewModel.hasEvents
+                        ? '${_formatDate(historyViewModel.events.first.timestamp)} - ${historyViewModel.events.first.status}'
+                        : 'No recent alerts',
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => context.push('/history'),
+                ),
               ),
             ],
           ),
@@ -125,12 +164,13 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
@@ -138,33 +178,6 @@ class _StatusChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(label),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: AppColors.primary),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
       ),
     );
   }

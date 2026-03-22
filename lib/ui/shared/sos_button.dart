@@ -4,8 +4,9 @@ import '../../app/theme/app_colors.dart';
 
 class SosButton extends StatefulWidget {
   final VoidCallback? onCompleted;
+  final double size;
 
-  const SosButton({super.key, this.onCompleted});
+  const SosButton({super.key, this.onCompleted, this.size = 260});
 
   @override
   State<SosButton> createState() => _SosButtonState();
@@ -33,11 +34,11 @@ class _SosButtonState extends State<SosButton>
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
 
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _shadowAnimation = Tween<double>(begin: 18, end: 30).animate(
+    _shadowAnimation = Tween<double>(begin: 20, end: 34).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -94,38 +95,43 @@ class _SosButtonState extends State<SosButton>
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final buttonSize = screenWidth * 0.62;
-    final ringSize = buttonSize + 26;
+    final buttonSize = widget.size;
+    final pulseMaxScale = 1.03;
+    final ringPadding = 24.0;
+    final ringStroke = 8.0;
+
+    final ringSize =
+        (buttonSize * pulseMaxScale) + (ringPadding * 2) + ringStroke;
 
     return GestureDetector(
       onTapDown: (_) => _startHolding(),
       onTapUp: (_) => _stopHolding(),
       onTapCancel: _stopHolding,
-      child: AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          return SizedBox(
-            width: ringSize,
-            height: ringSize,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: ringSize,
-                  height: ringSize,
-                  child: CircularProgressIndicator(
-                    value: _progress,
-                    strokeWidth: 8,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.18),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.danger,
-                    ),
-                  ),
+      child: SizedBox(
+        width: ringSize,
+        height: ringSize,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox(
+              width: ringSize,
+              height: ringSize,
+              child: CircularProgressIndicator(
+                value: _progress,
+                strokeWidth: ringStroke,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.outline.withValues(alpha: 0.18),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.danger,
                 ),
-                Transform.scale(
+              ),
+            ),
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                return Transform.scale(
                   scale: _scaleAnimation.value,
                   child: Container(
                     width: buttonSize,
@@ -137,7 +143,7 @@ class _SosButtonState extends State<SosButton>
                         BoxShadow(
                           color: AppColors.danger.withValues(alpha: 0.35),
                           blurRadius: _shadowAnimation.value,
-                          spreadRadius: 4,
+                          spreadRadius: 6,
                         ),
                         const BoxShadow(
                           color: Colors.black26,
@@ -146,11 +152,11 @@ class _SosButtonState extends State<SosButton>
                         ),
                       ],
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         'SOS',
                         style: TextStyle(
-                          fontSize: 50,
+                          fontSize: buttonSize * 0.24,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           letterSpacing: 1.2,
@@ -158,11 +164,11 @@ class _SosButtonState extends State<SosButton>
                       ),
                     ),
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
