@@ -7,32 +7,33 @@ import '../../ui/contacts/contacts_screen.dart';
 import '../../ui/history/history_screen.dart';
 import '../../ui/home/home_screen.dart';
 import '../../ui/map/map_screen.dart';
+import '../../ui/profile/account_info_screen.dart';
 import '../../ui/profile/profile_screen.dart';
+import '../../ui/profile/safety_prefs_screen.dart';
 import '../../ui/shared/main_shell.dart';
-import '../../ui/splash/splash_screen.dart';
+import '../../ui/alerts/alert_detail_screen.dart';
+import 'package:flutter/material.dart';
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   static GoRouter createRouter(AuthViewModel authViewModel) {
     return GoRouter(
-      initialLocation: '/splash',
+      navigatorKey: navigatorKey,
+      initialLocation: '/',
       refreshListenable: authViewModel,
       redirect: (context, state) {
         final isInitialized = authViewModel.isInitialized;
         final isLoggedIn = authViewModel.isLoggedIn;
-        final isSplashRoute = state.matchedLocation == '/splash';
         final isAuthRoute =
             state.matchedLocation == '/login' ||
             state.matchedLocation == '/register';
 
         if (!isInitialized) {
-          // Stay on splash until AuthViewModel reads session stream
-          return '/splash';
+          // While initializing, return null to show the native splash background
+          return null;
         }
 
-        if (isSplashRoute) {
-          // Initialized now, go to home or login
-          return isLoggedIn ? '/' : '/login';
-        }
 
         if (!isLoggedIn && !isAuthRoute) {
           return '/login';
@@ -45,10 +46,6 @@ class AppRouter {
         return null;
       },
       routes: [
-        GoRoute(
-          path: '/splash',
-          builder: (context, state) => const SplashScreen(),
-        ),
         GoRoute(
           path: '/login',
           builder: (context, state) => const LoginScreen(),
@@ -72,12 +69,28 @@ class AppRouter {
             GoRoute(
               path: '/profile',
               builder: (context, state) => const ProfileScreen(),
+              routes: [
+                GoRoute(
+                  path: 'account-info',
+                  builder: (context, state) => const AccountInfoScreen(),
+                ),
+                GoRoute(
+                  path: 'safety-prefs',
+                  builder: (context, state) => const SafetyPrefsScreen(),
+                ),
+              ],
             ),
           ],
         ),
         GoRoute(
           path: '/history',
           builder: (context, state) => const HistoryScreen(),
+        ),
+        GoRoute(
+          path: '/alert-detail/:alertId',
+          builder: (context, state) => AlertDetailScreen(
+            alertId: state.pathParameters['alertId']!,
+          ),
         ),
       ],
     );

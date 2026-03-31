@@ -7,6 +7,7 @@ import '../auth/auth_view_model.dart';
 import '../contacts/contacts_view_model.dart';
 import '../history/history_view_model.dart';
 import '../shared/sos_button.dart';
+import '../map/map_view_model.dart';
 import 'home_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -26,6 +27,7 @@ class HomeScreen extends StatelessWidget {
     final viewModel = context.watch<HomeViewModel>();
     final contactsViewModel = context.watch<ContactsViewModel>();
     final historyViewModel = context.watch<HistoryViewModel>();
+    final mapViewModel = context.watch<MapViewModel>();
     final authViewModel = context.watch<AuthViewModel>();
     final currentUser = authViewModel.currentUser;
     final firstName = currentUser?.fullName.split(' ').first ?? 'User';
@@ -45,7 +47,7 @@ class HomeScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('SoSecure', style: Theme.of(context).textTheme.titleLarge),
+            Text('SOSecure', style: Theme.of(context).textTheme.titleLarge),
             Text(
               'Stay prepared, stay safe',
               style: Theme.of(context).textTheme.bodySmall,
@@ -91,10 +93,12 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   _StatusChip(
                     icon: Icons.location_on,
-                    label: viewModel.isLocationActive
+                    label: (mapViewModel.isLocationPermissionGranted &&
+                            mapViewModel.isLocationServiceEnabled)
                         ? 'Location active'
                         : 'Location inactive',
-                    color: viewModel.isLocationActive
+                    color: (mapViewModel.isLocationPermissionGranted &&
+                            mapViewModel.isLocationServiceEnabled)
                         ? AppColors.success
                         : AppColors.danger,
                   ),
@@ -128,7 +132,25 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: viewModel.isSendingAlert 
+                    ? null 
+                    : () => viewModel.broadcastSms(),
+                  icon: const Icon(Icons.sms_outlined),
+                  label: const Text('Broadcast SOS via SMS'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: const BorderSide(color: AppColors.danger),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.history, color: AppColors.primary),

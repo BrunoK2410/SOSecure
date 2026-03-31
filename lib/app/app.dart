@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth_repository.dart';
@@ -8,6 +9,10 @@ import '../data/repositories/sos_repository.dart';
 import '../data/services/firebase_auth_service.dart';
 import '../data/services/firestore_service.dart';
 import '../data/services/location_service.dart';
+import '../data/services/notification_service.dart';
+import '../data/services/alert_monitoring_service.dart';
+import '../data/services/audio_service.dart';
+import '../data/services/storage_service.dart';
 import '../ui/auth/auth_view_model.dart';
 import '../ui/auth/login/login_view_model.dart';
 import '../ui/auth/register/register_view_model.dart';
@@ -27,6 +32,7 @@ class SOSecureApp extends StatelessWidget {
       providers: [
         Provider(create: (_) => FirebaseAuthService()),
         Provider(create: (_) => FirestoreService()),
+        Provider(create: (_) => NotificationService()..initialize()),
         Provider(
           create: (context) => AuthRepository(
             context.read<FirebaseAuthService>(),
@@ -48,8 +54,22 @@ class SOSecureApp extends StatelessWidget {
             context.read<FirestoreService>(),
           ),
         ),
+        Provider(create: (_) => AudioService()),
+        Provider(create: (_) => StorageService()),
         ChangeNotifierProvider(
-          create: (context) => AuthViewModel(context.read<AuthRepository>()),
+          create: (context) => AuthViewModel(
+            context.read<AuthRepository>(),
+            context.read<NotificationService>(),
+            context.read<FirestoreService>(),
+          ),
+        ),
+        Provider(
+          create: (context) => AlertMonitoringService(
+            context.read<AuthViewModel>(),
+            context.read<FirestoreService>(),
+            context.read<NotificationService>(),
+          ),
+          lazy: false, // Ensures it starts monitoring immediately
         ),
         ChangeNotifierProvider(
           create: (context) => LoginViewModel(context.read<AuthViewModel>()),
@@ -61,7 +81,11 @@ class SOSecureApp extends StatelessWidget {
           create: (context) => HomeViewModel(
             context.read<AuthViewModel>(),
             context.read<SosRepository>(),
+            context.read<ContactsRepository>(),
             context.read<LocationRepository>(),
+            context.read<FirestoreService>(),
+            context.read<AudioService>(),
+            context.read<StorageService>(),
           ),
         ),
         ChangeNotifierProvider(
@@ -84,6 +108,10 @@ class SOSecureApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final authViewModel = context.watch<AuthViewModel>();
+
+          if (authViewModel.isInitialized) {
+            FlutterNativeSplash.remove();
+          }
 
           return MaterialApp.router(
             debugShowCheckedModeBanner: false,

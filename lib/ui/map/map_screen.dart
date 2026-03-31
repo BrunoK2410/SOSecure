@@ -184,7 +184,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Grant permission so SoSecure can detect and share your position during emergencies.',
+                      'Grant permission so SOSecure can detect and share your position during emergencies.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 14),

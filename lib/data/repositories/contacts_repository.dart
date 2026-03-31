@@ -1,36 +1,29 @@
+import '../models/app_user.dart';
 import '../models/emergency_contact.dart';
+import '../services/firestore_service.dart';
 
 class ContactsRepository {
-  final List<EmergencyContact> _contacts = [
-    const EmergencyContact(
-      id: '1',
-      name: 'John Doe',
-      phoneNumber: '+385 91 123 4567',
-      relationship: 'Brother',
-    ),
-    const EmergencyContact(
-      id: '2',
-      name: 'Emma Wilson',
-      phoneNumber: '+385 98 765 4321',
-      relationship: 'Friend',
-    ),
-  ];
+  final FirestoreService _firestoreService;
 
-  List<EmergencyContact> getContacts() {
-    return List.unmodifiable(_contacts);
+  ContactsRepository(this._firestoreService);
+
+  Stream<List<EmergencyContact>> getContactsStream(String userId) {
+    return _firestoreService.getUserContactsStream(userId);
   }
 
-  void addContact(EmergencyContact contact) {
-    _contacts.add(contact);
+  Future<void> addContact(String userId, EmergencyContact contact) async {
+    await _firestoreService.addContact(userId, contact);
   }
 
-  void updateContact(EmergencyContact updatedContact) {
-    final index = _contacts.indexWhere((c) => c.id == updatedContact.id);
-    if (index == -1) return;
-    _contacts[index] = updatedContact;
+  Future<void> updateContact(String userId, EmergencyContact contact) async {
+    await _firestoreService.updateContact(userId, contact);
   }
 
-  void deleteContact(String id) {
-    _contacts.removeWhere((c) => c.id == id);
+  Future<void> deleteContact(String userId, String contactId) async {
+    await _firestoreService.deleteContact(userId, contactId);
+  }
+
+  Future<AppUser?> findUserByEmail(String email) async {
+    return _firestoreService.findUserByEmail(email);
   }
 }

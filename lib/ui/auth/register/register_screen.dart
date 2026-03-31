@@ -155,7 +155,7 @@ class _RegisterFormState extends State<_RegisterForm> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Set up your SoSecure account to manage alerts, contacts, and location sharing.',
+            'Set up your SOSecure account to manage alerts, contacts, and location sharing.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 28),

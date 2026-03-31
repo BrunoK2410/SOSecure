@@ -80,4 +80,108 @@ class FirestoreService {
         .doc(event.id)
         .set(event.toMap());
   }
+
+  Future<AppUser?> findUserByEmail(String email) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    
+    if (snapshot.docs.isNotEmpty) {
+      final doc = snapshot.docs.first;
+      return AppUser.fromMap(doc.data(), doc.id);
+    }
+    return null;
+  }
+
+  Future<AppUser?> findUserByPhone(String phone) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .where('phone', isEqualTo: phone)
+        .limit(1)
+        .get();
+    
+    if (snapshot.docs.isNotEmpty) {
+      final doc = snapshot.docs.first;
+      return AppUser.fromMap(doc.data(), doc.id);
+    }
+    return null;
+  }
+
+  // --- FCM Notifications ---
+
+  Future<String> sendSosSignal(String senderId, String senderName, List<String> recipientIds, double latitude, double longitude) async {
+    final alertId = _firestore.collection('alerts').doc().id;
+    await _firestore.collection('alerts').doc(alertId).set({
+      'id': alertId,
+      'senderId': senderId,
+      'senderName': senderName,
+      'recipientIds': recipientIds,
+      'latitude': latitude,
+      'longitude': longitude,
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'active',
+      'audioUrl': null,
+    });
+    return alertId;
+  }
+
+  Future<void> updateAlertAudioUrl(String alertId, String audioUrl) async {
+    await _firestore.collection('alerts').doc(alertId).update({
+      'audioUrl': audioUrl,
+    });
+  }
+
+  Future<void> updateAlertLocation(String alertId, double latitude, double longitude) async {
+    await _firestore.collection('alerts').doc(alertId).update({
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+  }
+
+  Stream<Map<String, dynamic>?> getAlertStream(String alertId) {
+    return _firestore
+        .collection('alerts')
+        .doc(alertId)
+        .snapshots()
+        .map((doc) => doc.data());
+  }
+
+  Stream<List<Map<String, dynamic>>> getAlertSignalsStream(String userId) {
+    return _firestore
+        .collection('alerts')
+        .where('recipientIds', arrayContains: userId)
+        .where('timestamp', isGreaterThanOrEqualTo: DateTime.now().subtract(const Duration(minutes: 5)))
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+  }
+
+  Future<void> updateFcmToken(String uid, String token) async {
+    await _firestore.collection('users').doc(uid).update({'fcmToken': token});
+  }
+
+  Future<List<String>> getLinkedContactsTokens(String uid) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('contacts')
+        .get();
+    
+    List<String> tokens = [];
+    for (var doc in snapshot.docs) {
+      final linkedUserEmail = doc.data()['linkedUserEmail'] as String?;
+      if (linkedUserEmail != null) {
+        final userSnapshot = await _firestore
+            .collection('users')
+            .where('email', isEqualTo: linkedUserEmail)
+            .get();
+        if (userSnapshot.docs.isNotEmpty) {
+          final token = userSnapshot.docs.first.data()['fcmToken'] as String?;
+          if (token != null) tokens.add(token);
+        }
+      }
+    }
+    return tokens;
+  }
 }

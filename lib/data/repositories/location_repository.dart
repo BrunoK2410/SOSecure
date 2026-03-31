@@ -1,9 +1,9 @@
 import 'package:geolocator/geolocator.dart';
-
 import '../services/location_service.dart';
 
 class LocationRepository {
   final LocationService _locationService;
+  Position? currentPosition;
 
   LocationRepository(this._locationService);
 
@@ -19,7 +19,9 @@ class LocationRepository {
     return _locationService.requestPermission();
   }
 
-  Future<Position> getCurrentPosition() {
-    return _locationService.getCurrentPosition();
+  Future<Position> getCurrentPosition() async {
+    final pos = await _locationService.getCurrentPosition();
+    currentPosition = pos;
+    return pos;
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/theme/app_colors.dart';
@@ -61,20 +62,24 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 32),
                     Card(
                       child: Column(
-                        children: const [
+                        children: [
                           ListTile(
-                            leading: Icon(Icons.person_outline),
-                            title: Text('Account information'),
-                            subtitle: Text('Manage your personal details'),
+                            leading: const Icon(Icons.person_outline),
+                            title: const Text('Account information'),
+                            subtitle: const Text('View your personal details'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.push('/profile/account-info'),
                           ),
-                          Divider(height: 1),
+                          const Divider(height: 1),
                           ListTile(
-                            leading: Icon(Icons.security_outlined),
-                            title: Text('Safety preferences'),
-                            subtitle: Text('Configure alert behavior'),
+                            leading: const Icon(Icons.security_outlined),
+                            title: const Text('Safety preferences'),
+                            subtitle: const Text('Configure alert behavior'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => context.push('/profile/safety-prefs'),
                           ),
-                          Divider(height: 1),
-                          ListTile(
+                          const Divider(height: 1),
+                          const ListTile(
                             leading: Icon(Icons.palette_outlined),
                             title: Text('Appearance'),
                             subtitle: Text('Light / dark mode follows system'),

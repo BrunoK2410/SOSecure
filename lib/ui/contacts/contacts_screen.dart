@@ -46,7 +46,7 @@ class ContactsScreen extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Swipe left to delete or tap edit to update a contact.',
+                            'Swipe left to delete or tap to edit a contact.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
@@ -56,7 +56,7 @@ class ContactsScreen extends StatelessWidget {
                     Expanded(
                       child: ListView.separated(
                         itemCount: viewModel.contacts.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final contact = viewModel.contacts[index];
 
@@ -96,74 +96,35 @@ class ContactsScreen extends StatelessWidget {
                               ),
                             ),
                             child: Card(
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.all(16),
-                                leading: CircleAvatar(
-                                  backgroundColor: AppColors.primary
-                                      .withOpacity(0.12),
-                                  child: Text(
-                                    contact.name.isNotEmpty
-                                        ? contact.name[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                              child: InkWell(
+                                onTap: () => _showEditContactDialog(context, contact),
+                                borderRadius: BorderRadius.circular(12),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(16),
+                                  leading: CircleAvatar(
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                                    child: const Icon(Icons.person, color: AppColors.primary),
                                   ),
-                                ),
-                                title: Text(contact.name),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  title: Row(
                                     children: [
-                                      Text(contact.phoneNumber),
-                                      const SizedBox(height: 4),
-                                      Text(contact.relationship),
+                                      Text(contact.name),
+                                      if (contact.uid != null) ...[
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.verified, size: 14, color: AppColors.success),
+                                      ],
                                     ],
                                   ),
-                                ),
-                                trailing: Wrap(
-                                  spacing: 4,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () {
-                                        _showEditContactDialog(
-                                          context,
-                                          contact,
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline),
-                                      onPressed: () async {
-                                        final shouldDelete =
-                                            await _showDeleteConfirmationDialog(
-                                              context,
-                                              contact,
-                                            );
-
-                                        if (shouldDelete == true &&
-                                            context.mounted) {
-                                          context
-                                              .read<ContactsViewModel>()
-                                              .deleteContact(contact.id);
-
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '${contact.name} was deleted',
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(contact.phoneNumber),
+                                      Text(
+                                        contact.relationship,
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
                                 ),
                               ),
                             ),
@@ -185,27 +146,27 @@ class ContactsScreen extends StatelessWidget {
     _showContactFormDialog(
       context,
       title: 'Add Emergency Contact',
-      description:
-          'Add a trusted person who should be notified in an emergency.',
+      description: 'Add a trusted person who should be notified in an emergency.',
       buttonText: 'Add Contact',
       icon: Icons.person_add_alt_1_rounded,
       iconColor: AppColors.primary,
-      onSubmit:
-          ({
-            required String name,
-            required String phoneNumber,
-            required String relationship,
-          }) {
-            context.read<ContactsViewModel>().addContact(
-              name: name,
-              phoneNumber: phoneNumber,
-              relationship: relationship,
-            );
+      onSubmit: ({
+        required String name,
+        required String phoneNumber,
+        required String relationship,
+        String? uid,
+      }) {
+        context.read<ContactsViewModel>().addContact(
+          name: name,
+          phoneNumber: phoneNumber,
+          relationship: relationship,
+          uid: uid,
+        );
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Contact added successfully')),
-            );
-          },
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contact added successfully')),
+        );
+      },
     );
   }
 
@@ -220,23 +181,25 @@ class ContactsScreen extends StatelessWidget {
       initialName: contact.name,
       initialPhoneNumber: contact.phoneNumber,
       initialRelationship: contact.relationship,
-      onSubmit:
-          ({
-            required String name,
-            required String phoneNumber,
-            required String relationship,
-          }) {
-            context.read<ContactsViewModel>().updateContact(
-              id: contact.id,
-              name: name,
-              phoneNumber: phoneNumber,
-              relationship: relationship,
-            );
+      initialUid: contact.uid,
+      onSubmit: ({
+        required String name,
+        required String phoneNumber,
+        required String relationship,
+        String? uid,
+      }) {
+        context.read<ContactsViewModel>().updateContact(
+          id: contact.id,
+          name: name,
+          phoneNumber: phoneNumber,
+          relationship: relationship,
+          uid: uid,
+        );
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Contact updated successfully')),
-            );
-          },
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contact updated successfully')),
+        );
+      },
     );
   }
 
@@ -251,21 +214,24 @@ class ContactsScreen extends StatelessWidget {
       required String name,
       required String phoneNumber,
       required String relationship,
-    })
-    onSubmit,
+      String? uid,
+    }) onSubmit,
     String initialName = '',
     String initialPhoneNumber = '',
     String initialRelationship = '',
+    String? initialUid,
   }) {
     final nameController = TextEditingController(text: initialName);
     final phoneController = TextEditingController(text: initialPhoneNumber);
-    final relationshipController = TextEditingController(
-      text: initialRelationship,
-    );
+    final relationshipController = TextEditingController(text: initialRelationship);
+    final emailController = TextEditingController();
 
     String? nameError;
     String? phoneError;
     String? relationshipError;
+    String? linkedUid = initialUid;
+    String? linkedName;
+    bool isSearching = false;
 
     bool isValidPhone(String phone) {
       final cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
@@ -277,6 +243,36 @@ class ContactsScreen extends StatelessWidget {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
+            Future<void> searchUser() async {
+              final email = emailController.text.trim();
+              if (email.isEmpty) return;
+
+              setState(() {
+                isSearching = true;
+                linkedUid = null;
+                linkedName = null;
+              });
+
+              try {
+                final user = await context.read<ContactsViewModel>().findUserByEmail(email);
+                setState(() {
+                  if (user != null) {
+                    linkedUid = user.id;
+                    linkedName = user.fullName;
+                    if (nameController.text.isEmpty) {
+                      nameController.text = user.fullName;
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No SOSecure user found with this email')),
+                    );
+                  }
+                });
+              } finally {
+                setState(() => isSearching = false);
+              }
+            }
+
             void validateAndSubmit() {
               final name = nameController.text.trim();
               final phone = phoneController.text.trim();
@@ -286,25 +282,17 @@ class ContactsScreen extends StatelessWidget {
                 nameError = name.isEmpty ? 'Name is required' : null;
                 phoneError = phone.isEmpty
                     ? 'Phone number is required'
-                    : (!isValidPhone(phone)
-                          ? 'Enter a valid phone number'
-                          : null);
-                relationshipError = relationship.isEmpty
-                    ? 'Relationship is required'
-                    : null;
+                    : (!isValidPhone(phone) ? 'Enter a valid phone number' : null);
+                relationshipError = relationship.isEmpty ? 'Relationship is required' : null;
               });
 
-              final hasError =
-                  nameError != null ||
-                  phoneError != null ||
-                  relationshipError != null;
-
-              if (hasError) return;
+              if (nameError != null || phoneError != null || relationshipError != null) return;
 
               onSubmit(
                 name: name,
                 phoneNumber: phone,
                 relationship: relationship,
+                uid: linkedUid,
               );
 
               Navigator.of(dialogContext).pop();
@@ -313,13 +301,8 @@ class ContactsScreen extends StatelessWidget {
             final colorScheme = Theme.of(context).colorScheme;
 
             return Dialog(
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 24,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
                 child: SingleChildScrollView(
@@ -330,24 +313,109 @@ class ContactsScreen extends StatelessWidget {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: iconColor.withOpacity(0.10),
+                          color: iconColor.withValues(alpha: 0.10),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(icon, size: 30, color: iconColor),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                      Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 8),
-                      Text(
-                        description,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                      Text(description, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
                       const SizedBox(height: 24),
+                      
+                      // LINKING SECTION
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: colorScheme.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.link, size: 18, color: colorScheme.primary),
+                                const SizedBox(width: 8),
+                                Text('Link SOSecure Account', style: Theme.of(context).textTheme.titleSmall),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text('Linked users get instant push notifications.', style: Theme.of(context).textTheme.bodySmall),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppTextField(
+                                    label: 'User email',
+                                    controller: emailController,
+                                    prefixIcon: const Icon(Icons.email_outlined),
+                                    hintText: 'user@example.com',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton.filledTonal(
+                                  onPressed: isSearching ? null : searchUser,
+                                  icon: isSearching 
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.search),
+                                ),
+                              ],
+                            ),
+                            if (linkedUid != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.verified, size: 16, color: AppColors.success),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Linked: ${linkedName ?? 'Account Found'}',
+                                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => setState(() => linkedUid = null),
+                                      child: const Icon(Icons.close, size: 16, color: AppColors.success),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (emailController.text.isNotEmpty && !isSearching) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    context.read<ContactsViewModel>().inviteContact(
+                                      phoneController.text.trim(),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.send_rounded, size: 16),
+                                  label: const Text('Send Invitation to Contact'),
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                                    foregroundColor: colorScheme.primary,
+                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 20),
                       AppTextField(
                         label: 'Full name',
                         controller: nameController,
@@ -357,7 +425,7 @@ class ContactsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
                       AppTextField(
-                        label: 'Phone number',
+                        label: 'Phone number (for SMS)',
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
@@ -429,7 +497,7 @@ class ContactsScreen extends StatelessWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: AppColors.danger.withOpacity(0.10),
+                    color: AppColors.danger.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -501,7 +569,7 @@ class _EmptyContactsState extends StatelessWidget {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.10),
+                color: AppColors.primary.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
