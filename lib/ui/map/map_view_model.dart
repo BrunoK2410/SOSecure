@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../../data/repositories/location_repository.dart';
 
@@ -82,7 +83,7 @@ class MapViewModel extends ChangeNotifier {
       final position = await _locationRepository.getCurrentPosition();
       latitude = position.latitude;
       longitude = position.longitude;
-      locationLabel = 'Current device location';
+      locationLabel = await _reverseGeocode(latitude, longitude);
     } on PermissionDeniedException {
       isLocationPermissionGranted = false;
       errorMessage = 'Location permission denied.';
@@ -95,5 +96,23 @@ class MapViewModel extends ChangeNotifier {
       isLoadingLocation = false;
       notifyListeners();
     }
+  }
+
+  Future<String> _reverseGeocode(double lat, double lng) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if (p.street != null && p.street!.isNotEmpty) p.street!,
+          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+          if (p.country != null && p.country!.isNotEmpty) p.country!,
+        ];
+        if (parts.isNotEmpty) return parts.join(', ');
+      }
+    } catch (e) {
+      debugPrint('Reverse geocoding failed: $e');
+    }
+    return 'Current device location';
   }
 }

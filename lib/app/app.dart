@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth_repository.dart';
@@ -23,8 +24,15 @@ import '../ui/map/map_view_model.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
-class SOSecureApp extends StatelessWidget {
+class SOSecureApp extends StatefulWidget {
   const SOSecureApp({super.key});
+
+  @override
+  State<SOSecureApp> createState() => _SOSecureAppState();
+}
+
+class _SOSecureAppState extends State<SOSecureApp> {
+  GoRouter? _router;
 
   @override
   Widget build(BuildContext context) {
@@ -113,13 +121,15 @@ class SOSecureApp extends StatelessWidget {
             FlutterNativeSplash.remove();
           }
 
+          _router ??= AppRouter.createRouter(authViewModel);
+
           return MaterialApp.router(
             debugShowCheckedModeBanner: false,
             title: 'SOSecure',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
-            routerConfig: AppRouter.createRouter(authViewModel),
+            routerConfig: _router!,
           );
         },
       ),

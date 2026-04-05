@@ -101,12 +101,14 @@ class HomeScreen extends StatelessWidget {
                             mapViewModel.isLocationServiceEnabled)
                         ? AppColors.success
                         : AppColors.danger,
+                    onTap: () => context.go('/map'),
                   ),
                   const SizedBox(width: 12),
                   _StatusChip(
                     icon: Icons.contacts,
                     label: '${contactsViewModel.contactsCount} contact(s)',
                     color: AppColors.primary,
+                    onTap: () => context.go('/contacts'),
                   ),
                 ],
               ),
@@ -176,30 +178,36 @@ class _StatusChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   const _StatusChip({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outline),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colorScheme.outline),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(label),
+          ],
+        ),
       ),
     );
   }

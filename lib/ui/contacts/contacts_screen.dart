@@ -155,12 +155,14 @@ class ContactsScreen extends StatelessWidget {
         required String phoneNumber,
         required String relationship,
         String? uid,
+        String? linkedUserEmail,
       }) {
         context.read<ContactsViewModel>().addContact(
           name: name,
           phoneNumber: phoneNumber,
           relationship: relationship,
           uid: uid,
+          linkedUserEmail: linkedUserEmail,
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,11 +184,13 @@ class ContactsScreen extends StatelessWidget {
       initialPhoneNumber: contact.phoneNumber,
       initialRelationship: contact.relationship,
       initialUid: contact.uid,
+      initialLinkedEmail: contact.linkedUserEmail,
       onSubmit: ({
         required String name,
         required String phoneNumber,
         required String relationship,
         String? uid,
+        String? linkedUserEmail,
       }) {
         context.read<ContactsViewModel>().updateContact(
           id: contact.id,
@@ -194,6 +198,7 @@ class ContactsScreen extends StatelessWidget {
           phoneNumber: phoneNumber,
           relationship: relationship,
           uid: uid,
+          linkedUserEmail: linkedUserEmail,
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,16 +220,18 @@ class ContactsScreen extends StatelessWidget {
       required String phoneNumber,
       required String relationship,
       String? uid,
+      String? linkedUserEmail,
     }) onSubmit,
     String initialName = '',
     String initialPhoneNumber = '',
     String initialRelationship = '',
     String? initialUid,
+    String? initialLinkedEmail,
   }) {
     final nameController = TextEditingController(text: initialName);
     final phoneController = TextEditingController(text: initialPhoneNumber);
     final relationshipController = TextEditingController(text: initialRelationship);
-    final emailController = TextEditingController();
+    final emailController = TextEditingController(text: initialLinkedEmail ?? '');
 
     String? nameError;
     String? phoneError;
@@ -232,6 +239,7 @@ class ContactsScreen extends StatelessWidget {
     String? linkedUid = initialUid;
     String? linkedName;
     bool isSearching = false;
+    bool _hasFetchedLegacyData = false;
 
     bool isValidPhone(String phone) {
       final cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
@@ -243,6 +251,20 @@ class ContactsScreen extends StatelessWidget {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
+            if (!_hasFetchedLegacyData && initialUid != null && emailController.text.isEmpty) {
+              _hasFetchedLegacyData = true;
+              Future.microtask(() async {
+                try {
+                  final user = await context.read<ContactsViewModel>().findUserById(initialUid);
+                  if (user != null) {
+                    setState(() {
+                      emailController.text = user.email;
+                      linkedName = user.fullName;
+                    });
+                  }
+                } catch (_) {}
+              });
+            }
             Future<void> searchUser() async {
               final email = emailController.text.trim();
               if (email.isEmpty) return;
@@ -293,6 +315,7 @@ class ContactsScreen extends StatelessWidget {
                 phoneNumber: phone,
                 relationship: relationship,
                 uid: linkedUid,
+                linkedUserEmail: linkedUid != null ? emailController.text.trim() : null,
               );
 
               Navigator.of(dialogContext).pop();
@@ -324,98 +347,6 @@ class ContactsScreen extends StatelessWidget {
                       Text(description, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
                       const SizedBox(height: 24),
                       
-                      // LINKING SECTION
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.outlineVariant),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.link, size: 18, color: colorScheme.primary),
-                                const SizedBox(width: 8),
-                                Text('Link SOSecure Account', style: Theme.of(context).textTheme.titleSmall),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text('Linked users get instant push notifications.', style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppTextField(
-                                    label: 'User email',
-                                    controller: emailController,
-                                    prefixIcon: const Icon(Icons.email_outlined),
-                                    hintText: 'user@example.com',
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton.filledTonal(
-                                  onPressed: isSearching ? null : searchUser,
-                                  icon: isSearching 
-                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                    : const Icon(Icons.search),
-                                ),
-                              ],
-                            ),
-                            if (linkedUid != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.verified, size: 16, color: AppColors.success),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        'Linked: ${linkedName ?? 'Account Found'}',
-                                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => setState(() => linkedUid = null),
-                                      child: const Icon(Icons.close, size: 16, color: AppColors.success),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ] else if (emailController.text.isNotEmpty && !isSearching) ...[
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: TextButton.icon(
-                                  onPressed: () {
-                                    context.read<ContactsViewModel>().inviteContact(
-                                      phoneController.text.trim(),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.send_rounded, size: 16),
-                                  label: const Text('Send Invitation to Contact'),
-                                  style: TextButton.styleFrom(
-                                    backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.4),
-                                    foregroundColor: colorScheme.primary,
-                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 20),
                       AppTextField(
                         label: 'Full name',
                         controller: nameController,
@@ -439,6 +370,106 @@ class ContactsScreen extends StatelessWidget {
                         textInputAction: TextInputAction.done,
                         prefixIcon: const Icon(Icons.favorite_border),
                         errorText: relationshipError,
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // LINKING SECTION
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          initiallyExpanded: initialUid != null,
+                          tilePadding: EdgeInsets.zero,
+                          title: Text(
+                            'Connect to their SOSecure app',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: colorScheme.primary),
+                          ),
+                          subtitle: Text(
+                            'Optional: If they use SOSecure, they\'ll get instant push notifications instead of just SMS.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(top: 8, bottom: 8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: colorScheme.outlineVariant),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: AppTextField(
+                                          label: 'User email',
+                                          controller: emailController,
+                                          prefixIcon: const Icon(Icons.email_outlined),
+                                          hintText: 'user@example.com',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton.filledTonal(
+                                        onPressed: isSearching ? null : searchUser,
+                                        icon: isSearching 
+                                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                          : const Icon(Icons.search),
+                                      ),
+                                    ],
+                                  ),
+                                  if (linkedUid != null) ...[
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.verified, size: 16, color: AppColors.success),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'Linked: ${linkedName ?? 'Account Found'}',
+                                              style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => setState(() => linkedUid = null),
+                                            child: const Icon(Icons.close, size: 16, color: AppColors.success),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else if (emailController.text.isNotEmpty && !isSearching) ...[
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: TextButton.icon(
+                                        onPressed: () {
+                                          context.read<ContactsViewModel>().inviteContact(
+                                            phoneController.text.trim(),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.sms_outlined, size: 16),
+                                        label: const Text('Send app invite via SMS'),
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                                          foregroundColor: colorScheme.primary,
+                                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(

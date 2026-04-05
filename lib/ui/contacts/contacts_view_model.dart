@@ -49,6 +49,11 @@ class ContactsViewModel extends ChangeNotifier {
     return await _repository.findUserByEmail(email);
   }
 
+  Future<AppUser?> findUserById(String uid) async {
+    if (uid.isEmpty) return null;
+    return await _repository.findUserById(uid);
+  }
+
   Future<void> inviteContact(String phoneNumber) async {
     if (phoneNumber.isEmpty) return;
     final String message = 'Hi! I added you as an emergency contact on SOSecure. Download the app to receive instant alerts: https://sosecure.app';
@@ -72,6 +77,7 @@ class ContactsViewModel extends ChangeNotifier {
     required String phoneNumber,
     required String relationship,
     String? uid,
+    String? linkedUserEmail,
   }) async {
     final user = _authViewModel.currentUser;
     if (user == null) return;
@@ -82,6 +88,7 @@ class ContactsViewModel extends ChangeNotifier {
       phoneNumber: phoneNumber,
       relationship: relationship,
       uid: uid,
+      linkedUserEmail: linkedUserEmail,
     );
 
     await _repository.addContact(user.id, contact);
@@ -93,6 +100,7 @@ class ContactsViewModel extends ChangeNotifier {
     required String phoneNumber,
     required String relationship,
     String? uid,
+    String? linkedUserEmail,
   }) async {
     final user = _authViewModel.currentUser;
     if (user == null) return;
@@ -103,6 +111,7 @@ class ContactsViewModel extends ChangeNotifier {
       phoneNumber: phoneNumber,
       relationship: relationship,
       uid: uid,
+      linkedUserEmail: linkedUserEmail,
     );
 
     await _repository.updateContact(user.id, updated);

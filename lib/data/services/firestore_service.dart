@@ -152,9 +152,18 @@ class FirestoreService {
     return _firestore
         .collection('alerts')
         .where('recipientIds', arrayContains: userId)
-        .where('timestamp', isGreaterThanOrEqualTo: DateTime.now().subtract(const Duration(minutes: 5)))
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+        .map((snapshot) {
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 5));
+      return snapshot.docs
+          .map((doc) => doc.data())
+          .where((data) {
+            final ts = data['timestamp'] as Timestamp?;
+            if (ts == null) return true; // Server timestamp might be pending initially
+            return ts.toDate().isAfter(cutoff);
+          })
+          .toList();
+    });
   }
 
   Future<void> updateFcmToken(String uid, String token) async {

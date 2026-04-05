@@ -26,4 +26,8 @@ class ContactsRepository {
   Future<AppUser?> findUserByEmail(String email) async {
     return _firestoreService.findUserByEmail(email);
   }
+
+  Future<AppUser?> findUserById(String uid) async {
+    return _firestoreService.getUser(uid);
+  }
 }

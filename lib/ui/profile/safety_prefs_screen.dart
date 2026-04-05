@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/theme/app_colors.dart';
 
 class SafetyPrefsScreen extends StatefulWidget {
@@ -11,6 +12,27 @@ class SafetyPrefsScreen extends StatefulWidget {
 class _SafetyPrefsScreenState extends State<SafetyPrefsScreen> {
   bool _silentSos = false;
   bool _confirmBeforeSend = true;
+  bool _recordAudio = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _silentSos = prefs.getBool('silentSos') ?? false;
+      _confirmBeforeSend = prefs.getBool('confirmBeforeSend') ?? true;
+      _recordAudio = prefs.getBool('recordAudio') ?? true;
+    });
+  }
+
+  Future<void> _saveBool(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +59,8 @@ class _SafetyPrefsScreenState extends State<SafetyPrefsScreen> {
                     subtitle: const Text('Send alerts without visual feedback'),
                     value: _silentSos,
                     onChanged: (value) {
-                      setState(() {
-                        _silentSos = value;
-                      });
+                      setState(() => _silentSos = value);
+                      _saveBool('silentSos', value);
                     },
                   ),
                   const Divider(height: 1, indent: 56),
@@ -49,9 +70,8 @@ class _SafetyPrefsScreenState extends State<SafetyPrefsScreen> {
                     subtitle: const Text('Add a 3-second delay before sending'),
                     value: _confirmBeforeSend,
                     onChanged: (value) {
-                      setState(() {
-                        _confirmBeforeSend = value;
-                      });
+                      setState(() => _confirmBeforeSend = value);
+                      _saveBool('confirmBeforeSend', value);
                     },
                   ),
                 ],
@@ -70,17 +90,22 @@ class _SafetyPrefsScreenState extends State<SafetyPrefsScreen> {
               child: SwitchListTile(
                 secondary: const Icon(Icons.mic_none_rounded),
                 title: const Text('Record Audio'),
-                subtitle: const Text('Start recording when SOS is triggered'),
-                value: false,
-                onChanged: null, // Placeholder for future feature
+                subtitle: const Text('Automatically record 20s of audio when SOS is triggered'),
+                value: _recordAudio,
+                onChanged: (value) {
+                  setState(() => _recordAudio = value);
+                  _saveBool('recordAudio', value);
+                },
               ),
             ),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'Some features are not yet available in this version.',
-                style: Theme.of(context).textTheme.bodySmall,
+                'Audio recordings are securely uploaded and only accessible to your emergency contacts.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
           ],

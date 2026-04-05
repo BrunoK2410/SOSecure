@@ -1,7 +1,7 @@
 name: sosecure
 description: "A new Flutter project."
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.11.1
@@ -32,6 +32,8 @@ dependencies:
   firebase_storage: any
   path_provider: any
   just_audio: ^0.9.36
+  shared_preferences: any
+  geocoding: any
 
 dev_dependencies:
   flutter_test:

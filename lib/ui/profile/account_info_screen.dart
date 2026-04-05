@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/theme/app_colors.dart';
@@ -47,6 +48,7 @@ class AccountInfoScreen extends StatelessWidget {
                           value: user.id,
                           icon: Icons.fingerprint,
                           isLast: true,
+                          isCopyable: true,
                         ),
                       ],
                     ),
@@ -94,12 +96,14 @@ class _InfoItem extends StatelessWidget {
   final String value;
   final IconData icon;
   final bool isLast;
+  final bool isCopyable;
 
   const _InfoItem({
     required this.label,
     required this.value,
     required this.icon,
     this.isLast = false,
+    this.isCopyable = false,
   });
 
   @override
@@ -115,6 +119,14 @@ class _InfoItem extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
           ),
+          trailing: isCopyable
+              ? Icon(Icons.copy_rounded, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant)
+              : null,
+          onTap: isCopyable
+              ? () {
+                  Clipboard.setData(ClipboardData(text: value));
+                }
+              : null,
         ),
         if (!isLast) const Divider(height: 1, indent: 56),
       ],

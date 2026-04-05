@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -114,7 +115,10 @@ class HomeViewModel extends ChangeNotifier {
       final linkedRecipientIds = <String>[];
       
       for (var c in contacts) {
-        if (c.linkedUserEmail != null) {
+        if (c.uid != null) {
+          linkedRecipientIds.add(c.uid!);
+        } else if (c.linkedUserEmail != null) {
+          // Fallback just in case
           final linkedUser = await _firestoreService.findUserByEmail(c.linkedUserEmail!);
           if (linkedUser != null) {
             linkedRecipientIds.add(linkedUser.id);
@@ -135,7 +139,11 @@ class HomeViewModel extends ChangeNotifier {
 
       // Start Recording and Periodic Location Updates
       if (alertId != null) {
-        _startEmergencyRecording(user.id, alertId);
+        final prefs = await SharedPreferences.getInstance();
+        final recordAudio = prefs.getBool('recordAudio') ?? true;
+        if (recordAudio) {
+          _startEmergencyRecording(user.id, alertId);
+        }
         _startLiveLocationUpdates(alertId);
       }
 
