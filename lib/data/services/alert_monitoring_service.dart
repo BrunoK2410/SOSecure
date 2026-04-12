@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../ui/auth/auth_view_model.dart';
 import 'firestore_service.dart';
@@ -10,7 +11,8 @@ class AlertMonitoringService {
   final NotificationService _notificationService;
 
   StreamSubscription? _signalsSubscription;
-  String? _lastAlertId;
+  final Set<String> _seenAlertIds = {};
+  DateTime? _monitoringStartedAt;
 
   AlertMonitoringService(
     this._authViewModel,
@@ -37,22 +39,38 @@ class AlertMonitoringService {
     final userId = _authViewModel.currentUser?.id;
     if (userId == null || _signalsSubscription != null) return;
 
+    // Record when this monitoring session started — only alerts AFTER this
+    // moment should trigger a notification. This prevents old active alerts
+    // from re-notifying every time the app is opened.
+    _monitoringStartedAt = DateTime.now();
+
     debugPrint('Starting Alert Monitoring for user: $userId');
-    
+
     _signalsSubscription = _firestoreService.getAlertSignalsStream(userId).listen((signals) {
       if (signals.isEmpty) return;
 
-      // The stream gets the latest alerts. We only show if it's a "new" alert
-      // for this session to avoid double-notifying.
-      final latestAlert = signals.last;
-      final alertId = latestAlert['id'] as String?;
+      for (final alert in signals) {
+        final alertId = alert['id'] as String?;
+        if (alertId == null) continue;
 
-      if (alertId != null && alertId != _lastAlertId) {
-        _lastAlertId = alertId;
-        final senderName = latestAlert['senderName'] as String? ?? 'Someone';
-        
+        // Skip alerts we've already shown a notification for this session
+        if (_seenAlertIds.contains(alertId)) continue;
+
+        // Skip alerts that existed before we started monitoring
+        final ts = alert['timestamp'] as Timestamp?;
+        if (ts != null && _monitoringStartedAt != null) {
+          if (ts.toDate().isBefore(_monitoringStartedAt!)) {
+            // Mark as seen so we don't re-check it
+            _seenAlertIds.add(alertId);
+            continue;
+          }
+        }
+
+        _seenAlertIds.add(alertId);
+        final senderName = alert['senderName'] as String? ?? 'Someone';
+
         debugPrint('New SOS Signal received from $senderName!');
-        
+
         _notificationService.showEmergencyNotification(
           title: '🚨 EMERGENCY SOS',
           body: '$senderName has triggered an SOS alert! Tap to see their location.',
@@ -66,7 +84,8 @@ class AlertMonitoringService {
     debugPrint('Stopping Alert Monitoring');
     _signalsSubscription?.cancel();
     _signalsSubscription = null;
-    _lastAlertId = null;
+    _seenAlertIds.clear();
+    _monitoringStartedAt = null;
   }
 
   void dispose() {

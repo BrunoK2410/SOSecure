@@ -16,6 +16,7 @@ exports.onSosAlert = onDocumentCreated(
         return null;
       }
 
+      const alertId = event.params.alertId;
       const alertData = snapshot.data();
       const {senderName, recipientIds} = alertData;
 
@@ -24,7 +25,7 @@ exports.onSosAlert = onDocumentCreated(
         return null;
       }
 
-      logger.info(`Processing SOS Alert from ${senderName} ` +
+      logger.info(`Processing SOS Alert ${alertId} from ${senderName} ` +
                   `for ${recipientIds.length} users`);
 
       try {
@@ -55,6 +56,7 @@ exports.onSosAlert = onDocumentCreated(
                   `Tap to see their location.`,
           },
           data: {
+            alertId: alertId,
             senderId: alertData.senderId || "",
             click_action: "FLUTTER_NOTIFICATION_CLICK",
           },
@@ -83,9 +85,20 @@ exports.onSosAlert = onDocumentCreated(
                     `${response.successCount} successful, ` +
                     `${response.failureCount} failed`);
 
+        // Log individual failures for debugging
+        if (response.failureCount > 0) {
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              logger.warn(`Failed to send to token ${tokens[idx]}: ` +
+                          `${resp.error?.message}`);
+            }
+          });
+        }
+
         return null;
       } catch (error) {
         logger.error("Error sending SOS notification", error);
         return null;
       }
     });
+

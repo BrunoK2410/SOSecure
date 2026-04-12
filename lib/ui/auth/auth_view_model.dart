@@ -10,6 +10,7 @@ class AuthViewModel extends ChangeNotifier {
   final NotificationService _notificationService;
   final FirestoreService _firestoreService;
   StreamSubscription<AppUser?>? _userSubscription;
+  StreamSubscription<String>? _tokenRefreshSubscription;
 
   AppUser? _currentUser;
   bool _isInitialized = false;
@@ -30,6 +31,14 @@ class AuthViewModel extends ChangeNotifier {
         _syncFcmToken();
       }
       notifyListeners();
+    });
+
+    // Re-sync token whenever Firebase rotates it — prevents stale tokens
+    _tokenRefreshSubscription = _notificationService.onTokenRefresh.listen((newToken) {
+      if (_currentUser != null) {
+        debugPrint('FCM Token rotated, re-syncing...');
+        _firestoreService.updateFcmToken(_currentUser!.id, newToken);
+      }
     });
   }
 
@@ -85,6 +94,7 @@ class AuthViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _userSubscription?.cancel();
+    _tokenRefreshSubscription?.cancel();
     super.dispose();
   }
 }

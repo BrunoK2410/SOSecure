@@ -92,26 +92,53 @@ class NotificationService {
       }
     });
 
-    // Handle background/terminated state when app is opened via notification
+    // Handle background state when app is opened via notification tap
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('A new onMessageOpenedApp event was published!');
-      // Navigate to alert screen if needed
+      debugPrint('onMessageOpenedApp: ${message.data}');
+      _navigateToAlertFromMessage(message);
     });
+
+    // Handle terminated state — app was killed, user taps notification to open
+    final initialMessage = await _fcm.getInitialMessage();
+    if (initialMessage != null) {
+      debugPrint('App opened from terminated via notification: ${initialMessage.data}');
+      // Delay briefly so the router is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _navigateToAlertFromMessage(initialMessage);
+      });
+    }
   }
 
   Future<String?> getToken() async {
     return await _fcm.getToken();
   }
 
+  /// Stream that fires whenever the FCM token is rotated by Firebase.
+  Stream<String> get onTokenRefresh => _fcm.onTokenRefresh;
+
+  void _navigateToAlertFromMessage(RemoteMessage message) {
+    final alertId = message.data['alertId'] as String?;
+    if (alertId != null && alertId.isNotEmpty) {
+      final context = AppRouter.navigatorKey.currentContext;
+      if (context != null) {
+        GoRouter.of(context).push('/alert-detail/$alertId');
+      }
+    }
+  }
+
   void _showLocalNotification(RemoteMessage message) {
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
+
+    // Extract alertId from the FCM data payload so tapping navigates correctly
+    final alertId = message.data['alertId'] as String?;
 
     if (notification != null && android != null) {
       showEmergencyNotification(
         title: notification.title ?? 'Emergency Alert',
         body: notification.body ?? 'Someone needs help!',
         icon: android.smallIcon,
+        payload: alertId,
       );
     }
   }
