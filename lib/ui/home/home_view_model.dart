@@ -234,9 +234,7 @@ class HomeViewModel extends ChangeNotifier {
         );
         
         if (downloadUrl != null) {
-          // LINK TO FIRESTORE ALERT
-          await _firestoreService.updateAlertAudioUrl(alertId, downloadUrl);
-          debugPrint('Emergency audio linked to alert $alertId');
+          debugPrint('Emergency audio uploaded. Cloud Function will link it to alert $alertId');
         }
       }
     } catch (e) {

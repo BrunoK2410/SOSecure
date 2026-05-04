@@ -98,3 +98,4 @@ class AuthViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
+
