@@ -5,8 +5,16 @@ import '../../app/theme/app_colors.dart';
 class SosButton extends StatefulWidget {
   final VoidCallback? onCompleted;
   final double size;
+  final bool silentMode;
+  final bool enabled;
 
-  const SosButton({super.key, this.onCompleted, this.size = 260});
+  const SosButton({
+    super.key,
+    this.onCompleted,
+    this.size = 260,
+    this.silentMode = false,
+    this.enabled = true,
+  });
 
   @override
   State<SosButton> createState() => _SosButtonState();
@@ -51,7 +59,7 @@ class _SosButtonState extends State<SosButton>
   }
 
   void _startHolding() {
-    if (_isHolding) return;
+    if (!widget.enabled || _isHolding) return;
 
     _isHolding = true;
     _holdTimer?.cancel();
@@ -99,6 +107,7 @@ class _SosButtonState extends State<SosButton>
     final pulseMaxScale = 1.03;
     final ringPadding = 24.0;
     final ringStroke = 8.0;
+    final silent = widget.silentMode;
 
     final ringSize =
         (buttonSize * pulseMaxScale) + (ringPadding * 2) + ringStroke;
@@ -114,52 +123,61 @@ class _SosButtonState extends State<SosButton>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            SizedBox(
-              width: ringSize,
-              height: ringSize,
-              child: CircularProgressIndicator(
-                value: _progress,
-                strokeWidth: ringStroke,
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.18),
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.danger,
+            if (!silent)
+              SizedBox(
+                width: ringSize,
+                height: ringSize,
+                child: CircularProgressIndicator(
+                  value: _progress,
+                  strokeWidth: ringStroke,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.18),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.danger,
+                  ),
                 ),
               ),
-            ),
             AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
+                final scale = silent ? 1.0 : _scaleAnimation.value;
+                final blur = silent ? 8.0 : _shadowAnimation.value;
+                final glowAlpha = silent ? 0.12 : 0.35;
+                final spread = silent ? 0.0 : 6.0;
+
                 return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Container(
-                    width: buttonSize,
-                    height: buttonSize,
-                    decoration: BoxDecoration(
-                      color: AppColors.danger,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.danger.withValues(alpha: 0.35),
-                          blurRadius: _shadowAnimation.value,
-                          spreadRadius: 6,
-                        ),
-                        const BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 12,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        'SOS',
-                        style: TextStyle(
-                          fontSize: buttonSize * 0.24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 1.2,
+                  scale: scale,
+                  child: Opacity(
+                    opacity: widget.enabled ? 1.0 : 0.55,
+                    child: Container(
+                      width: buttonSize,
+                      height: buttonSize,
+                      decoration: BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.danger.withValues(alpha: glowAlpha),
+                            blurRadius: blur,
+                            spreadRadius: spread,
+                          ),
+                          const BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 12,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'SOS',
+                          style: TextStyle(
+                            fontSize: buttonSize * 0.24,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                     ),

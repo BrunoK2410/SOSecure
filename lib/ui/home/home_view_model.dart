@@ -27,6 +27,10 @@ class HomeViewModel extends ChangeNotifier {
   bool isSendingAlert = false;
   String? lastMessage;
 
+  bool silentSos = false;
+  bool confirmBeforeSend = true;
+  int? confirmCountdownSeconds;
+
   HomeViewModel(
     this._authViewModel,
     this._sosRepository,
@@ -35,14 +39,18 @@ class HomeViewModel extends ChangeNotifier {
     this._firestoreService,
     this._audioService,
     this._storageService,
-  );
+  ) {
+    loadSafetyPrefs();
+  }
 
   final AudioService _audioService;
   final StorageService _storageService;
   String? _currentRecordingPath;
   SosEvent? _currentSosEvent;
+  Timer? _confirmTimer;
 
   bool get isRecordingAudio => _currentRecordingPath != null;
+  bool get isConfirmingSos => confirmCountdownSeconds != null;
 
   void setLocationActive(bool value) {
     isLocationActive = value;
@@ -54,13 +62,66 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadSafetyPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    silentSos = prefs.getBool('silentSos') ?? false;
+    confirmBeforeSend = prefs.getBool('confirmBeforeSend') ?? true;
+    notifyListeners();
+  }
+
+  /// Called when the SOS hold gesture completes.
+  Future<void> onSosHoldCompleted() async {
+    if (isSendingAlert || isConfirmingSos) return;
+
+    await loadSafetyPrefs();
+
+    if (confirmBeforeSend) {
+      _startConfirmCountdown();
+    } else {
+      await triggerSos();
+    }
+  }
+
+  void _startConfirmCountdown() {
+    _confirmTimer?.cancel();
+    confirmCountdownSeconds = 3;
+    notifyListeners();
+
+    _confirmTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final remaining = confirmCountdownSeconds;
+      if (remaining == null) {
+        timer.cancel();
+        return;
+      }
+
+      if (remaining <= 1) {
+        timer.cancel();
+        confirmCountdownSeconds = null;
+        notifyListeners();
+        triggerSos();
+      } else {
+        confirmCountdownSeconds = remaining - 1;
+        notifyListeners();
+      }
+    });
+  }
+
+  void cancelConfirmCountdown() {
+    _confirmTimer?.cancel();
+    _confirmTimer = null;
+    confirmCountdownSeconds = null;
+    notifyListeners();
+  }
+
   Future<void> triggerSos() async {
     if (isSendingAlert) return;
 
     final user = _authViewModel.currentUser;
     if (user == null) {
-      lastMessage = 'Must be logged in to send SOS';
-      notifyListeners();
+      if (!silentSos) {
+        lastMessage = 'Must be logged in to send SOS';
+        notifyListeners();
+      }
       return;
     }
 
@@ -113,13 +174,14 @@ class HomeViewModel extends ChangeNotifier {
       // --- New: Send signals to linked contacts ---
       final contacts = await _contactsRepository.getContactsStream(user.id).first;
       final linkedRecipientIds = <String>[];
-      
+
       for (var c in contacts) {
         if (c.uid != null) {
           linkedRecipientIds.add(c.uid!);
         } else if (c.linkedUserEmail != null) {
           // Fallback just in case
-          final linkedUser = await _firestoreService.findUserByEmail(c.linkedUserEmail!);
+          final linkedUser =
+              await _firestoreService.findUserByEmail(c.linkedUserEmail!);
           if (linkedUser != null) {
             linkedRecipientIds.add(linkedUser.id);
           }
@@ -147,9 +209,15 @@ class HomeViewModel extends ChangeNotifier {
         _startLiveLocationUpdates(alertId);
       }
 
-      lastMessage = 'SOS alert triggered successfully';
+      if (!silentSos) {
+        lastMessage = 'SOS alert triggered successfully';
+      }
     } catch (e) {
-      lastMessage = 'Failed to send SOS: $e';
+      if (!silentSos) {
+        lastMessage = 'Failed to send SOS: $e';
+      } else {
+        debugPrint('Silent SOS failed: $e');
+      }
     } finally {
       isSendingAlert = false;
       notifyListeners();
@@ -175,11 +243,13 @@ class HomeViewModel extends ChangeNotifier {
 
       final lat = position.latitude;
       final lng = position.longitude;
-      final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-      
+      final googleMapsUrl =
+          'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+
       final String phoneNumbers = contacts.map((c) => c.phoneNumber).join(',');
-      final String message = 'SOS! I need help. My current location: $googleMapsUrl';
-      
+      final String message =
+          'SOS! I need help. My current location: $googleMapsUrl';
+
       final Uri smsUri = Uri(
         scheme: 'sms',
         path: phoneNumbers,
@@ -232,9 +302,10 @@ class HomeViewModel extends ChangeNotifier {
           sosId: alertId,
           filePath: path,
         );
-        
+
         if (downloadUrl != null) {
-          debugPrint('Emergency audio uploaded. Cloud Function will link it to alert $alertId');
+          debugPrint(
+              'Emergency audio uploaded. Cloud Function will link it to alert $alertId');
         }
       }
     } catch (e) {
@@ -248,15 +319,17 @@ class HomeViewModel extends ChangeNotifier {
   Timer? _locationUpdateTimer;
   void _startLiveLocationUpdates(String alertId) {
     _locationUpdateTimer?.cancel();
-    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+    _locationUpdateTimer =
+        Timer.periodic(const Duration(seconds: 15), (timer) async {
       if (_currentSosEvent == null) {
         timer.cancel();
         return;
       }
-      
+
       final pos = _locationRepository.currentPosition;
       if (pos != null) {
-        await _firestoreService.updateAlertLocation(alertId, pos.latitude, pos.longitude);
+        await _firestoreService.updateAlertLocation(
+            alertId, pos.latitude, pos.longitude);
       }
     });
   }
@@ -264,5 +337,12 @@ class HomeViewModel extends ChangeNotifier {
   void clearMessage() {
     lastMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _confirmTimer?.cancel();
+    _locationUpdateTimer?.cancel();
+    super.dispose();
   }
 }

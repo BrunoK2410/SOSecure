@@ -10,8 +10,22 @@ import '../shared/sos_button.dart';
 import '../map/map_view_model.dart';
 import 'home_view_model.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<HomeViewModel>().loadSafetyPrefs();
+    });
+  }
 
   String _formatDate(DateTime dateTime) {
     final day = dateTime.day.toString().padLeft(2, '0');
@@ -32,13 +46,29 @@ class HomeScreen extends StatelessWidget {
     final currentUser = authViewModel.currentUser;
     final firstName = currentUser?.fullName.split(' ').first ?? 'User';
 
-    if (viewModel.lastMessage != null) {
+    if (viewModel.lastMessage != null && !viewModel.silentSos) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final message = viewModel.lastMessage;
+        if (message == null) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(viewModel.lastMessage!)));
+        ).showSnackBar(SnackBar(content: Text(message)));
         viewModel.clearMessage();
       });
+    }
+
+    final String statusText;
+    if (viewModel.isConfirmingSos) {
+      statusText = viewModel.silentSos
+          ? ''
+          : 'Sending in ${viewModel.confirmCountdownSeconds}s — tap Cancel';
+    } else if (viewModel.isSendingAlert) {
+      statusText = viewModel.silentSos ? '' : 'Sending SOS alert...';
+    } else if (viewModel.confirmBeforeSend) {
+      statusText = 'Press and hold to start 3s confirmation';
+    } else {
+      statusText = 'Press and hold to trigger alert';
     }
 
     return Scaffold(
@@ -58,7 +88,11 @@ class HomeScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
-              onTap: () => context.push('/profile'),
+              onTap: () async {
+                await context.push('/profile');
+                if (!mounted) return;
+                context.read<HomeViewModel>().loadSafetyPrefs();
+              },
               child: CircleAvatar(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                 child: Text(
@@ -115,11 +149,38 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 44),
 
               Center(
-                child: SosButton(
-                  size: 260,
-                  onCompleted: () async {
-                    await context.read<HomeViewModel>().triggerSos();
-                  },
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SosButton(
+                      size: 260,
+                      silentMode: viewModel.silentSos,
+                      enabled: !viewModel.isSendingAlert &&
+                          !viewModel.isConfirmingSos,
+                      onCompleted: () {
+                        context.read<HomeViewModel>().onSosHoldCompleted();
+                      },
+                    ),
+                    if (viewModel.isConfirmingSos && !viewModel.silentSos)
+                      IgnorePointer(
+                        child: Text(
+                          '${viewModel.confirmCountdownSeconds}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .displayLarge
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -127,19 +188,29 @@ class HomeScreen extends StatelessWidget {
 
               Center(
                 child: Text(
-                  viewModel.isSendingAlert
-                      ? 'Sending SOS alert...'
-                      : 'Press and hold to trigger alert',
+                  statusText,
+                  textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
+              if (viewModel.isConfirmingSos) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: viewModel.cancelConfirmCountdown,
+                    child: Text(
+                      viewModel.silentSos ? 'Cancel' : 'Cancel SOS',
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: viewModel.isSendingAlert 
-                    ? null 
-                    : () => viewModel.broadcastSms(),
+                  onPressed: viewModel.isSendingAlert || viewModel.isConfirmingSos
+                      ? null
+                      : () => viewModel.broadcastSms(),
                   icon: const Icon(Icons.sms_outlined),
                   label: const Text('Broadcast SOS via SMS'),
                   style: OutlinedButton.styleFrom(
