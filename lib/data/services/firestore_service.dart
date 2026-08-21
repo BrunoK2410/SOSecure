@@ -140,6 +140,31 @@ class FirestoreService {
     });
   }
 
+  Future<void> resolveAlert(String alertId) async {
+    await _firestore.collection('alerts').doc(alertId).update({
+      'status': 'resolved',
+      'resolvedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<String?> getActiveAlertForSender(String senderId) async {
+    try {
+      final snap = await _firestore
+          .collection('alerts')
+          .where('senderId', isEqualTo: senderId)
+          .where('status', isEqualTo: 'active')
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        return snap.docs.first.id;
+      }
+    } catch (e) {
+      // In case indexing or permissions cause an issue
+      return null;
+    }
+    return null;
+  }
+
   Stream<Map<String, dynamic>?> getAlertStream(String alertId) {
     return _firestore
         .collection('alerts')

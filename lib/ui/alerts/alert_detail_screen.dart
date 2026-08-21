@@ -77,61 +77,17 @@ class AlertDetailScreen extends StatelessWidget {
 
                     // -- Map --
                     Text(
-                      'Location',
+                      'Live Location',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                     const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: SizedBox(
-                        height: 280,
-                        width: double.infinity,
-                        child: GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: LatLng(lat, lng),
-                            zoom: 15,
-                          ),
-                          markers: {
-                            Marker(
-                              markerId: const MarkerId('sender'),
-                              position: LatLng(lat, lng),
-                              infoWindow: InfoWindow(title: senderName),
-                            ),
-                          },
-                          zoomControlsEnabled: false,
-                          myLocationButtonEnabled: false,
-                          liteModeEnabled: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Row(
-                        children: [
-                          Icon(Icons.location_on,
-                              size: 14,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    _AlertMapSection(
+                      lat: lat,
+                      lng: lng,
+                      senderName: senderName,
+                      address: model.locationAddress,
                     ),
                     const SizedBox(height: 20),
 
@@ -489,6 +445,97 @@ class _AudioProofCard extends StatelessWidget {
           size: 28,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Live Map Section (Dynamic Camera & Marker)
+// ---------------------------------------------------------------------------
+class _AlertMapSection extends StatefulWidget {
+  final double lat;
+  final double lng;
+  final String senderName;
+  final String? address;
+
+  const _AlertMapSection({
+    required this.lat,
+    required this.lng,
+    required this.senderName,
+    this.address,
+  });
+
+  @override
+  State<_AlertMapSection> createState() => _AlertMapSectionState();
+}
+
+class _AlertMapSectionState extends State<_AlertMapSection> {
+  GoogleMapController? _mapController;
+
+  @override
+  void didUpdateWidget(covariant _AlertMapSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lat != widget.lat || oldWidget.lng != widget.lng) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(widget.lat, widget.lng)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 280,
+            width: double.infinity,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: LatLng(widget.lat, widget.lng),
+                zoom: 16,
+              ),
+              onMapCreated: (controller) => _mapController = controller,
+              markers: {
+                Marker(
+                  markerId: const MarkerId('sender'),
+                  position: LatLng(widget.lat, widget.lng),
+                  infoWindow: InfoWindow(title: widget.senderName),
+                ),
+              },
+              zoomControlsEnabled: false,
+              myLocationButtonEnabled: false,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.location_on,
+                size: 16,
+                color: AppColors.danger,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  widget.address != null
+                      ? '${widget.address!} (${widget.lat.toStringAsFixed(5)}, ${widget.lng.toStringAsFixed(5)})'
+                      : '${widget.lat.toStringAsFixed(5)}, ${widget.lng.toStringAsFixed(5)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

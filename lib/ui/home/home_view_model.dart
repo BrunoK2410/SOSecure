@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
@@ -30,6 +31,10 @@ class HomeViewModel extends ChangeNotifier {
   bool silentSos = false;
   bool confirmBeforeSend = true;
   int? confirmCountdownSeconds;
+  String? activeAlertId;
+  bool isResolvingAlert = false;
+
+  bool get hasActiveAlert => activeAlertId != null;
 
   HomeViewModel(
     this._authViewModel,
@@ -41,12 +46,12 @@ class HomeViewModel extends ChangeNotifier {
     this._storageService,
   ) {
     loadSafetyPrefs();
+    _checkExistingActiveAlert();
   }
 
   final AudioService _audioService;
   final StorageService _storageService;
   String? _currentRecordingPath;
-  SosEvent? _currentSosEvent;
   Timer? _confirmTimer;
 
   bool get isRecordingAudio => _currentRecordingPath != null;
@@ -60,6 +65,20 @@ class HomeViewModel extends ChangeNotifier {
   void setContactsCount(int value) {
     contactsCount = value;
     notifyListeners();
+  }
+
+  Future<void> _checkExistingActiveAlert() async {
+    final user = _authViewModel.currentUser;
+    if (user == null) return;
+    try {
+      final existingAlertId = await _firestoreService.getActiveAlertForSender(user.id);
+      if (existingAlertId != null) {
+        activeAlertId = existingAlertId;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error checking active alert: $e');
+    }
   }
 
   Future<void> loadSafetyPrefs() async {
@@ -129,6 +148,8 @@ class HomeViewModel extends ChangeNotifier {
     lastMessage = null;
     notifyListeners();
 
+    String eventStatus = 'Sent';
+
     try {
       double lat = 0.0;
       double lng = 0.0;
@@ -147,8 +168,7 @@ class HomeViewModel extends ChangeNotifier {
               .timeout(const Duration(seconds: 10));
           lat = position.latitude;
           lng = position.longitude;
-          locationLbl =
-              'Current Location (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
+          locationLbl = await _reverseGeocode(lat, lng);
         } else {
           locationLbl = 'Location Permission Denied';
         }
@@ -157,21 +177,16 @@ class HomeViewModel extends ChangeNotifier {
         locationLbl = 'Location Unavailable';
       }
 
-      final newEvent = SosEvent(
-        id: _uuid.v4(),
-        timestamp: DateTime.now(),
-        locationLabel: locationLbl,
-        latitude: lat,
-        longitude: lng,
-        status: 'Sent',
-      );
-      _currentSosEvent = newEvent;
+      // If there's an existing active alert, auto-resolve it before starting a new one
+      if (activeAlertId != null) {
+        final prevAlertId = activeAlertId!;
+        _firestoreService.resolveAlert(prevAlertId).catchError((e) {
+          debugPrint('Error auto-resolving previous alert $prevAlertId: $e');
+        });
+        activeAlertId = null;
+      }
 
-      _sosRepository.addEvent(user.id, newEvent).catchError((e) {
-        debugPrint('Background sync error: $e');
-      });
-
-      // --- New: Send signals to linked contacts ---
+      // --- Send signals to linked contacts ---
       final contacts = await _contactsRepository.getContactsStream(user.id).first;
       final linkedRecipientIds = <String>[];
 
@@ -197,6 +212,7 @@ class HomeViewModel extends ChangeNotifier {
           _locationRepository.currentPosition?.latitude ?? 0.0,
           _locationRepository.currentPosition?.longitude ?? 0.0,
         );
+        activeAlertId = alertId;
       }
 
       // Start Recording and Periodic Location Updates
@@ -209,10 +225,39 @@ class HomeViewModel extends ChangeNotifier {
         _startLiveLocationUpdates(alertId);
       }
 
+      // Save event with actual status
+      final newEvent = SosEvent(
+        id: _uuid.v4(),
+        timestamp: DateTime.now(),
+        locationLabel: locationLbl,
+        latitude: lat,
+        longitude: lng,
+        status: eventStatus,
+      );
+
+      _sosRepository.addEvent(user.id, newEvent).catchError((e) {
+        debugPrint('Background sync error: $e');
+      });
+
       if (!silentSos) {
         lastMessage = 'SOS alert triggered successfully';
       }
     } catch (e) {
+      eventStatus = 'Failed';
+
+      // Still save the failed event for history
+      final failedEvent = SosEvent(
+        id: _uuid.v4(),
+        timestamp: DateTime.now(),
+        locationLabel: 'Unknown',
+        latitude: 0.0,
+        longitude: 0.0,
+        status: eventStatus,
+      );
+      _sosRepository.addEvent(user.id, failedEvent).catchError((e2) {
+        debugPrint('Background sync error: $e2');
+      });
+
       if (!silentSos) {
         lastMessage = 'Failed to send SOS: $e';
       } else {
@@ -220,6 +265,34 @@ class HomeViewModel extends ChangeNotifier {
       }
     } finally {
       isSendingAlert = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resolveActiveAlert() async {
+    if (activeAlertId == null || isResolvingAlert) return;
+
+    isResolvingAlert = true;
+    notifyListeners();
+
+    try {
+      final alertId = activeAlertId!;
+      await _firestoreService.resolveAlert(alertId);
+
+      _locationUpdateTimer?.cancel();
+      _locationUpdateTimer = null;
+      activeAlertId = null;
+
+      if (!silentSos) {
+        lastMessage = 'Alert marked as resolved. Contacts notified that you are safe.';
+      }
+    } catch (e) {
+      debugPrint('Failed to resolve alert: $e');
+      if (!silentSos) {
+        lastMessage = 'Failed to mark as safe: $e';
+      }
+    } finally {
+      isResolvingAlert = false;
       notifyListeners();
     }
   }
@@ -321,17 +394,41 @@ class HomeViewModel extends ChangeNotifier {
     _locationUpdateTimer?.cancel();
     _locationUpdateTimer =
         Timer.periodic(const Duration(seconds: 15), (timer) async {
-      if (_currentSosEvent == null) {
+      if (activeAlertId != alertId) {
         timer.cancel();
         return;
       }
 
-      final pos = _locationRepository.currentPosition;
-      if (pos != null) {
+      try {
+        final pos = await _locationRepository.getCurrentPosition();
         await _firestoreService.updateAlertLocation(
-            alertId, pos.latitude, pos.longitude);
+          alertId,
+          pos.latitude,
+          pos.longitude,
+        );
+        debugPrint('Live location updated: ${pos.latitude}, ${pos.longitude}');
+      } catch (e) {
+        debugPrint('Error updating live location: $e');
       }
     });
+  }
+
+  Future<String> _reverseGeocode(double lat, double lng) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if (p.street != null && p.street!.isNotEmpty) p.street!,
+          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+          if (p.country != null && p.country!.isNotEmpty) p.country!,
+        ];
+        if (parts.isNotEmpty) return parts.join(', ');
+      }
+    } catch (e) {
+      debugPrint('Reverse geocoding failed: $e');
+    }
+    return 'Current device location';
   }
 
   void clearMessage() {

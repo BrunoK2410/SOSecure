@@ -65,6 +65,10 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'Sending in ${viewModel.confirmCountdownSeconds}s — tap Cancel';
     } else if (viewModel.isSendingAlert) {
       statusText = viewModel.silentSos ? '' : 'Sending SOS alert...';
+    } else if (viewModel.hasActiveAlert) {
+      statusText = viewModel.silentSos
+          ? ''
+          : 'SOS is active — contacts notified';
     } else if (viewModel.confirmBeforeSend) {
       statusText = 'Press and hold to start 3s confirmation';
     } else {
@@ -89,9 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
               onTap: () async {
+                final homeVm = context.read<HomeViewModel>();
                 await context.push('/profile');
                 if (!mounted) return;
-                context.read<HomeViewModel>().loadSafetyPrefs();
+                homeVm.loadSafetyPrefs();
               },
               child: CircleAvatar(
                 backgroundColor: AppColors.primary.withValues(alpha: 0.12),
@@ -200,6 +205,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: viewModel.cancelConfirmCountdown,
                     child: Text(
                       viewModel.silentSos ? 'Cancel' : 'Cancel SOS',
+                    ),
+                  ),
+                ),
+              ],
+              if (viewModel.hasActiveAlert && !viewModel.isConfirmingSos) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: viewModel.isResolvingAlert
+                        ? null
+                        : () => viewModel.resolveActiveAlert(),
+                    icon: viewModel.isResolvingAlert
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check_circle_outline),
+                    label: const Text("I'm Safe (Resolve Alert)"),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),

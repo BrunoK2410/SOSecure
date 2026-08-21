@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../data/services/firestore_service.dart';
 
@@ -14,6 +15,9 @@ class AlertDetailViewModel extends ChangeNotifier {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   Map<String, dynamic>? alertData;
+  String? locationAddress;
+  double? _lastGeocodedLat;
+  double? _lastGeocodedLng;
   bool isLoading = true;
 
   // Audio state
@@ -32,8 +36,36 @@ class AlertDetailViewModel extends ChangeNotifier {
     _firestoreService.getAlertStream(alertId).listen((data) {
       alertData = data;
       isLoading = false;
+      if (data != null) {
+        final lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
+        final lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
+        if (lat != 0.0 && lng != 0.0) {
+          _updateAddress(lat, lng);
+        }
+      }
       notifyListeners();
     });
+  }
+
+  Future<void> _updateAddress(double lat, double lng) async {
+    if (_lastGeocodedLat == lat && _lastGeocodedLng == lng) return;
+    _lastGeocodedLat = lat;
+    _lastGeocodedLng = lng;
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if (p.street != null && p.street!.isNotEmpty) p.street!,
+          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+          if (p.country != null && p.country!.isNotEmpty) p.country!,
+        ];
+        if (parts.isNotEmpty) {
+          locationAddress = parts.join(', ');
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
   }
 
   void _initAudioListeners() {
