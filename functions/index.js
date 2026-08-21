@@ -1,6 +1,6 @@
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
-const {onObjectFinalized} = require("firebase-functions/v2/storage");
-const {getStorage, getDownloadURL} = require("firebase-admin/storage");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onObjectFinalized } = require("firebase-functions/v2/storage");
+const { getStorage, getDownloadURL } = require("firebase-admin/storage");
 const admin = require("firebase-admin");
 const logger = require("firebase-functions/logger");
 
@@ -15,7 +15,7 @@ exports.onSosAlert = onDocumentCreated("alerts/{alertId}", async (event) => {
 
   const alertId = event.params.alertId;
   const alertData = snapshot.data();
-  const {senderName, recipientIds} = alertData;
+  const { senderName, recipientIds } = alertData;
 
   if (!recipientIds || recipientIds.length === 0) {
     logger.info("No recipients for this alert");
@@ -23,7 +23,7 @@ exports.onSosAlert = onDocumentCreated("alerts/{alertId}", async (event) => {
   }
 
   logger.info(`Processing SOS Alert ${alertId} from ${senderName} ` +
-      `for ${recipientIds.length} users`,
+    `for ${recipientIds.length} users`,
   );
 
   try {
@@ -47,7 +47,7 @@ exports.onSosAlert = onDocumentCreated("alerts/{alertId}", async (event) => {
 
     const message = {
       notification: {
-        title: "🚨 EMERGENCY SOS",
+        title: "EMERGENCY SOS",
         body:
           `${senderName} has triggered an SOS alert! ` +
           `Tap to see their location.`,
@@ -78,15 +78,15 @@ exports.onSosAlert = onDocumentCreated("alerts/{alertId}", async (event) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
     logger.info(`Alert broadcast complete: ` +
-        `${response.successCount} successful, ` +
-        `${response.failureCount} failed`,
+      `${response.successCount} successful, ` +
+      `${response.failureCount} failed`,
     );
 
     if (response.failureCount > 0) {
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           logger.warn(`Failed to send to token ${tokens[idx]}: ` +
-              `${resp.error?.message}`,
+            `${resp.error?.message}`,
           );
         }
       });
